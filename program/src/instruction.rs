@@ -11,361 +11,63 @@ use solana_program::{
 use std::convert::TryInto;
 use std::mem::size_of;
 
-/// Minimum number of multisignature signers (min N)
 pub const MIN_SIGNERS: usize = 1;
-/// Maximum number of multisignature signers (max N)
 pub const MAX_SIGNERS: usize = 11;
 
-/// Instructions supported by the token program.
 #[repr(C)]
 #[derive(Clone, Debug, PartialEq)]
 pub enum TokenInstruction {
-    /// Initializes a new mint and optionally deposits all the newly minted
-    /// tokens in an account.
-    ///
-    /// The `InitializeMint` instruction requires no signers and MUST be
-    /// included within the same Transaction as the system program's
-    /// `CreateAccount` instruction that creates the account being initialized.
-    /// Otherwise another party can acquire ownership of the uninitialized
-    /// account.
-    ///
-    /// Accounts expected by this instruction:
-    ///
-    ///   0. `[writable]` The mint to initialize.
-    ///   1. `[]` Rent sysvar
-    ///
     InitializeMint {
-        /// Number of base 10 digits to the right of the decimal place.
         decimals: u8,
-        /// The authority/multisignature to mint tokens.
         mint_authority: Pubkey,
-        /// The freeze authority/multisignature of the mint.
         freeze_authority: COption<Pubkey>,
     },
-    /// Initializes a new account to hold tokens.  If this account is associated
-    /// with the native mint then the token balance of the initialized account
-    /// will be equal to the amount of SOL in the account. If this account is
-    /// associated with another mint, that mint must be initialized before this
-    /// command can succeed.
-    ///
-    /// The `InitializeAccount` instruction requires no signers and MUST be
-    /// included within the same Transaction as the system program's
-    /// `CreateAccount` instruction that creates the account being initialized.
-    /// Otherwise another party can acquire ownership of the uninitialized
-    /// account.
-    ///
-    /// Accounts expected by this instruction:
-    ///
-    ///   0. `[writable]`  The account to initialize.
-    ///   1. `[]` The mint this account will be associated with.
-    ///   2. `[]` The new account's owner/multisignature.
-    ///   3. `[]` Rent sysvar
     InitializeAccount,
-    /// Initializes a multisignature account with N provided signers.
-    ///
-    /// Multisignature accounts can used in place of any single owner/delegate
-    /// accounts in any token instruction that require an owner/delegate to be
-    /// present.  The variant field represents the number of signers (M)
-    /// required to validate this multisignature account.
-    ///
-    /// The `InitializeMultisig` instruction requires no signers and MUST be
-    /// included within the same Transaction as the system program's
-    /// `CreateAccount` instruction that creates the account being initialized.
-    /// Otherwise another party can acquire ownership of the uninitialized
-    /// account.
-    ///
-    /// Accounts expected by this instruction:
-    ///
-    ///   0. `[writable]` The multisignature account to initialize.
-    ///   1. `[]` Rent sysvar
-    ///   2. ..2+N. `[]` The signer accounts, must equal to N where 1 <= N <=
-    ///      11.
     InitializeMultisig {
-        /// The number of signers (M) required to validate this multisignature
-        /// account.
         m: u8,
     },
-    /// Transfers tokens from one account to another either directly or via a
-    /// delegate.  If this account is associated with the native mint then equal
-    /// amounts of SOL and Tokens will be transferred to the destination
-    /// account.
-    ///
-    /// Accounts expected by this instruction:
-    ///
-    ///   * Single owner/delegate
-    ///   0. `[writable]` The source account.
-    ///   1. `[writable]` The destination account.
-    ///   2. `[signer]` The source account's owner/delegate.
-    ///
-    ///   * Multisignature owner/delegate
-    ///   0. `[writable]` The source account.
-    ///   1. `[writable]` The destination account.
-    ///   2. `[]` The source account's multisignature owner/delegate.
-    ///   3. ..3+M `[signer]` M signer accounts.
     Transfer {
-        /// The amount of tokens to transfer.
         amount: u64,
     },
-    /// Approves a delegate.  A delegate is given the authority over tokens on
-    /// behalf of the source account's owner.
-    ///
-    /// Accounts expected by this instruction:
-    ///
-    ///   * Single owner
-    ///   0. `[writable]` The source account.
-    ///   1. `[]` The delegate.
-    ///   2. `[signer]` The source account owner.
-    ///
-    ///   * Multisignature owner
-    ///   0. `[writable]` The source account.
-    ///   1. `[]` The delegate.
-    ///   2. `[]` The source account's multisignature owner.
-    ///   3. ..3+M `[signer]` M signer accounts
     Approve {
-        /// The amount of tokens the delegate is approved for.
         amount: u64,
     },
-    /// Revokes the delegate's authority.
-    ///
-    /// Accounts expected by this instruction:
-    ///
-    ///   * Single owner
-    ///   0. `[writable]` The source account.
-    ///   1. `[signer]` The source account owner.
-    ///
-    ///   * Multisignature owner
-    ///   0. `[writable]` The source account.
-    ///   1. `[]` The source account's multisignature owner.
-    ///   2. ..2+M `[signer]` M signer accounts
     Revoke,
-    /// Sets a new authority of a mint or account.
-    ///
-    /// Accounts expected by this instruction:
-    ///
-    ///   * Single authority
-    ///   0. `[writable]` The mint or account to change the authority of.
-    ///   1. `[signer]` The current authority of the mint or account.
-    ///
-    ///   * Multisignature authority
-    ///   0. `[writable]` The mint or account to change the authority of.
-    ///   1. `[]` The mint's or account's current multisignature authority.
-    ///   2. ..2+M `[signer]` M signer accounts
     SetAuthority {
-        /// The type of authority to update.
         authority_type: AuthorityType,
-        /// The new authority
         new_authority: COption<Pubkey>,
     },
-    /// Mints new tokens to an account.  The native mint does not support
-    /// minting.
-    ///
-    /// Accounts expected by this instruction:
-    ///
-    ///   * Single authority
-    ///   0. `[writable]` The mint.
-    ///   1. `[writable]` The account to mint tokens to.
-    ///   2. `[signer]` The mint's minting authority.
-    ///
-    ///   * Multisignature authority
-    ///   0. `[writable]` The mint.
-    ///   1. `[writable]` The account to mint tokens to.
-    ///   2. `[]` The mint's multisignature mint-tokens authority.
-    ///   3. ..3+M `[signer]` M signer accounts.
     MintTo {
-        /// The amount of new tokens to mint.
         amount: u64,
     },
-    /// Burns tokens by removing them from an account.  `Burn` does not support
-    /// accounts associated with the native mint, use `CloseAccount` instead.
-    ///
-    /// Accounts expected by this instruction:
-    ///
-    ///   * Single owner/delegate
-    ///   0. `[writable]` The account to burn from.
-    ///   1. `[writable]` The token mint.
-    ///   2. `[signer]` The account's owner/delegate.
-    ///
-    ///   * Multisignature owner/delegate
-    ///   0. `[writable]` The account to burn from.
-    ///   1. `[writable]` The token mint.
-    ///   2. `[]` The account's multisignature owner/delegate.
-    ///   3. ..3+M `[signer]` M signer accounts.
     Burn {
-        /// The amount of tokens to burn.
         amount: u64,
     },
-    /// Close an account by transferring all its SOL to the destination account.
-    /// Non-native accounts may only be closed if its token amount is zero.
-    ///
-    /// Accounts expected by this instruction:
-    ///
-    ///   * Single owner
-    ///   0. `[writable]` The account to close.
-    ///   1. `[writable]` The destination account.
-    ///   2. `[signer]` The account's owner.
-    ///
-    ///   * Multisignature owner
-    ///   0. `[writable]` The account to close.
-    ///   1. `[writable]` The destination account.
-    ///   2. `[]` The account's multisignature owner.
-    ///   3. ..3+M `[signer]` M signer accounts.
     CloseAccount,
-    /// Freeze an Initialized account using the Mint's freeze_authority (if
-    /// set).
-    ///
-    /// Accounts expected by this instruction:
-    ///
-    ///   * Single owner
-    ///   0. `[writable]` The account to freeze.
-    ///   1. `[]` The token mint.
-    ///   2. `[signer]` The mint freeze authority.
-    ///
-    ///   * Multisignature owner
-    ///   0. `[writable]` The account to freeze.
-    ///   1. `[]` The token mint.
-    ///   2. `[]` The mint's multisignature freeze authority.
-    ///   3. ..3+M `[signer]` M signer accounts.
     FreezeAccount,
-    /// Thaw a Frozen account using the Mint's freeze_authority (if set).
-    ///
-    /// Accounts expected by this instruction:
-    ///
-    ///   * Single owner
-    ///   0. `[writable]` The account to freeze.
-    ///   1. `[]` The token mint.
-    ///   2. `[signer]` The mint freeze authority.
-    ///
-    ///   * Multisignature owner
-    ///   0. `[writable]` The account to freeze.
-    ///   1. `[]` The token mint.
-    ///   2. `[]` The mint's multisignature freeze authority.
-    ///   3. ..3+M `[signer]` M signer accounts.
     ThawAccount,
 
-    /// Transfers tokens from one account to another either directly or via a
-    /// delegate.  If this account is associated with the native mint then equal
-    /// amounts of SOL and Tokens will be transferred to the destination
-    /// account.
-    ///
-    /// This instruction differs from Transfer in that the token mint and
-    /// decimals value is checked by the caller.  This may be useful when
-    /// creating transactions offline or within a hardware wallet.
-    ///
-    /// Accounts expected by this instruction:
-    ///
-    ///   * Single owner/delegate
-    ///   0. `[writable]` The source account.
-    ///   1. `[]` The token mint.
-    ///   2. `[writable]` The destination account.
-    ///   3. `[signer]` The source account's owner/delegate.
-    ///
-    ///   * Multisignature owner/delegate
-    ///   0. `[writable]` The source account.
-    ///   1. `[]` The token mint.
-    ///   2. `[writable]` The destination account.
-    ///   3. `[]` The source account's multisignature owner/delegate.
-    ///   4. ..4+M `[signer]` M signer accounts.
     TransferChecked {
-        /// The amount of tokens to transfer.
         amount: u64,
-        /// Expected number of base 10 digits to the right of the decimal place.
         decimals: u8,
     },
-    /// Approves a delegate.  A delegate is given the authority over tokens on
-    /// behalf of the source account's owner.
-    ///
-    /// This instruction differs from Approve in that the token mint and
-    /// decimals value is checked by the caller.  This may be useful when
-    /// creating transactions offline or within a hardware wallet.
-    ///
-    /// Accounts expected by this instruction:
-    ///
-    ///   * Single owner
-    ///   0. `[writable]` The source account.
-    ///   1. `[]` The token mint.
-    ///   2. `[]` The delegate.
-    ///   3. `[signer]` The source account owner.
-    ///
-    ///   * Multisignature owner
-    ///   0. `[writable]` The source account.
-    ///   1. `[]` The token mint.
-    ///   2. `[]` The delegate.
-    ///   3. `[]` The source account's multisignature owner.
-    ///   4. ..4+M `[signer]` M signer accounts
     ApproveChecked {
-        /// The amount of tokens the delegate is approved for.
         amount: u64,
-        /// Expected number of base 10 digits to the right of the decimal place.
         decimals: u8,
     },
-    /// Mints new tokens to an account.  The native mint does not support
-    /// minting.
-    ///
-    /// This instruction differs from MintTo in that the decimals value is
-    /// checked by the caller.  This may be useful when creating transactions
-    /// offline or within a hardware wallet.
-    ///
-    /// Accounts expected by this instruction:
-    ///
-    ///   * Single authority
-    ///   0. `[writable]` The mint.
-    ///   1. `[writable]` The account to mint tokens to.
-    ///   2. `[signer]` The mint's minting authority.
-    ///
-    ///   * Multisignature authority
-    ///   0. `[writable]` The mint.
-    ///   1. `[writable]` The account to mint tokens to.
-    ///   2. `[]` The mint's multisignature mint-tokens authority.
-    ///   3. ..3+M `[signer]` M signer accounts.
     MintToChecked {
-        /// The amount of new tokens to mint.
         amount: u64,
-        /// Expected number of base 10 digits to the right of the decimal place.
         decimals: u8,
     },
-    /// Burns tokens by removing them from an account.  `BurnChecked` does not
-    /// support accounts associated with the native mint, use `CloseAccount`
-    /// instead.
-    ///
-    /// This instruction differs from Burn in that the decimals value is checked
-    /// by the caller. This may be useful when creating transactions offline or
-    /// within a hardware wallet.
-    ///
-    /// Accounts expected by this instruction:
-    ///
-    ///   * Single owner/delegate
-    ///   0. `[writable]` The account to burn from.
-    ///   1. `[writable]` The token mint.
-    ///   2. `[signer]` The account's owner/delegate.
-    ///
-    ///   * Multisignature owner/delegate
-    ///   0. `[writable]` The account to burn from.
-    ///   1. `[writable]` The token mint.
-    ///   2. `[]` The account's multisignature owner/delegate.
-    ///   3. ..3+M `[signer]` M signer accounts.
     BurnChecked {
-        /// The amount of tokens to burn.
         amount: u64,
-        /// Expected number of base 10 digits to the right of the decimal place.
         decimals: u8,
     },
-    /// Like InitializeAccount, but the owner pubkey is passed via instruction data
-    /// rather than the accounts list. This variant may be preferable when using
-    /// Cross Program Invocation from an instruction that does not need the owner's
-    /// `AccountInfo` otherwise.
-    ///
-    /// Accounts expected by this instruction:
-    ///
-    ///   0. `[writable]`  The account to initialize.
-    ///   1. `[]` The mint this account will be associated with.
-    ///   3. `[]` Rent sysvar
     InitializeAccount2 {
-        /// The new account's owner/multisignature.
         owner: Pubkey,
     },
 }
 impl TokenInstruction {
-    /// Unpacks a byte buffer into a [TokenInstruction](enum.TokenInstruction.html).
     pub fn unpack(input: &[u8]) -> Result<Self, ProgramError> {
         use TokenError::InvalidInstruction;
 
@@ -469,7 +171,6 @@ impl TokenInstruction {
         })
     }
 
-    /// Packs a [TokenInstruction](enum.TokenInstruction.html) into a byte buffer.
     pub fn pack(&self) -> Vec<u8> {
         let mut buf = Vec::with_capacity(size_of::<Self>());
         match self {
@@ -577,17 +278,12 @@ impl TokenInstruction {
     }
 }
 
-/// Specifies the authority type for SetAuthority instructions
 #[repr(u8)]
 #[derive(Clone, Debug, PartialEq)]
 pub enum AuthorityType {
-    /// Authority to mint new tokens
     MintTokens,
-    /// Authority to freeze any account associated with the Mint
     FreezeAccount,
-    /// Owner of a given token account
     AccountOwner,
-    /// Authority to close a token account
     CloseAccount,
 }
 
@@ -612,7 +308,6 @@ impl AuthorityType {
     }
 }
 
-/// Creates a `InitializeMint` instruction.
 pub fn initialize_mint(
     token_program_id: &Pubkey,
     mint_pubkey: &Pubkey,
@@ -640,7 +335,6 @@ pub fn initialize_mint(
     })
 }
 
-/// Creates a `InitializeAccount` instruction.
 pub fn initialize_account(
     token_program_id: &Pubkey,
     account_pubkey: &Pubkey,
@@ -663,7 +357,6 @@ pub fn initialize_account(
     })
 }
 
-/// Creates a `InitializeAccount2` instruction.
 pub fn initialize_account2(
     token_program_id: &Pubkey,
     account_pubkey: &Pubkey,
@@ -688,7 +381,6 @@ pub fn initialize_account2(
     })
 }
 
-/// Creates a `InitializeMultisig` instruction.
 pub fn initialize_multisig(
     token_program_id: &Pubkey,
     multisig_pubkey: &Pubkey,
@@ -717,7 +409,6 @@ pub fn initialize_multisig(
     })
 }
 
-/// Creates a `Transfer` instruction.
 pub fn transfer(
     token_program_id: &Pubkey,
     source_pubkey: &Pubkey,
@@ -746,7 +437,6 @@ pub fn transfer(
     })
 }
 
-/// Creates an `Approve` instruction.
 pub fn approve(
     token_program_id: &Pubkey,
     source_pubkey: &Pubkey,
@@ -775,7 +465,6 @@ pub fn approve(
     })
 }
 
-/// Creates a `Revoke` instruction.
 pub fn revoke(
     token_program_id: &Pubkey,
     source_pubkey: &Pubkey,
@@ -801,7 +490,6 @@ pub fn revoke(
     })
 }
 
-/// Creates a `SetAuthority` instruction.
 pub fn set_authority(
     token_program_id: &Pubkey,
     owned_pubkey: &Pubkey,
@@ -834,7 +522,6 @@ pub fn set_authority(
     })
 }
 
-/// Creates a `MintTo` instruction.
 pub fn mint_to(
     token_program_id: &Pubkey,
     mint_pubkey: &Pubkey,
@@ -863,7 +550,6 @@ pub fn mint_to(
     })
 }
 
-/// Creates a `Burn` instruction.
 pub fn burn(
     token_program_id: &Pubkey,
     account_pubkey: &Pubkey,
@@ -892,7 +578,6 @@ pub fn burn(
     })
 }
 
-/// Creates a `CloseAccount` instruction.
 pub fn close_account(
     token_program_id: &Pubkey,
     account_pubkey: &Pubkey,
@@ -920,7 +605,6 @@ pub fn close_account(
     })
 }
 
-/// Creates a `FreezeAccount` instruction.
 pub fn freeze_account(
     token_program_id: &Pubkey,
     account_pubkey: &Pubkey,
@@ -948,7 +632,6 @@ pub fn freeze_account(
     })
 }
 
-/// Creates a `ThawAccount` instruction.
 pub fn thaw_account(
     token_program_id: &Pubkey,
     account_pubkey: &Pubkey,
@@ -976,7 +659,6 @@ pub fn thaw_account(
     })
 }
 
-/// Creates a `TransferChecked` instruction.
 #[allow(clippy::too_many_arguments)]
 pub fn transfer_checked(
     token_program_id: &Pubkey,
@@ -1009,7 +691,6 @@ pub fn transfer_checked(
     })
 }
 
-/// Creates an `ApproveChecked` instruction.
 #[allow(clippy::too_many_arguments)]
 pub fn approve_checked(
     token_program_id: &Pubkey,
@@ -1042,7 +723,6 @@ pub fn approve_checked(
     })
 }
 
-/// Creates a `MintToChecked` instruction.
 pub fn mint_to_checked(
     token_program_id: &Pubkey,
     mint_pubkey: &Pubkey,
@@ -1072,7 +752,6 @@ pub fn mint_to_checked(
     })
 }
 
-/// Creates a `BurnChecked` instruction.
 pub fn burn_checked(
     token_program_id: &Pubkey,
     account_pubkey: &Pubkey,
@@ -1102,7 +781,6 @@ pub fn burn_checked(
     })
 }
 
-/// Utility function that checks index is between MIN_SIGNERS and MAX_SIGNERS
 pub fn is_valid_signer_index(index: usize) -> bool {
     (MIN_SIGNERS..=MAX_SIGNERS).contains(&index)
 }
