@@ -191,59 +191,59 @@ impl Default for AccountState {
     }
 }
 
-/// Multisignature data.
-#[repr(C)]
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub struct Multisig {
-    /// Number of signers required
-    pub m: u8,
-    /// Number of valid signers
-    pub n: u8,
-    /// Is `true` if this structure has been initialized
-    pub is_initialized: bool,
-    /// Signer public keys
-    pub signers: [Pubkey; MAX_SIGNERS],
-}
-impl Sealed for Multisig {}
-impl IsInitialized for Multisig {
-    fn is_initialized(&self) -> bool {
-        self.is_initialized
-    }
-}
-impl Pack for Multisig {
-    const LEN: usize = 355;
-    fn unpack_from_slice(src: &[u8]) -> Result<Self, ProgramError> {
-        let src = array_ref![src, 0, 355];
-        #[allow(clippy::ptr_offset_with_cast)]
-        let (m, n, is_initialized, signers_flat) = array_refs![src, 1, 1, 1, 32 * MAX_SIGNERS];
-        let mut result = Multisig {
-            m: m[0],
-            n: n[0],
-            is_initialized: match is_initialized {
-                [0] => false,
-                [1] => true,
-                _ => return Err(ProgramError::InvalidAccountData),
-            },
-            signers: [Pubkey::new_from_array([0u8; 32]); MAX_SIGNERS],
-        };
-        for (src, dst) in signers_flat.chunks(32).zip(result.signers.iter_mut()) {
-            *dst = Pubkey::new(src);
-        }
-        Ok(result)
-    }
-    fn pack_into_slice(&self, dst: &mut [u8]) {
-        let dst = array_mut_ref![dst, 0, 355];
-        #[allow(clippy::ptr_offset_with_cast)]
-        let (m, n, is_initialized, signers_flat) = mut_array_refs![dst, 1, 1, 1, 32 * MAX_SIGNERS];
-        *m = [self.m];
-        *n = [self.n];
-        *is_initialized = [self.is_initialized as u8];
-        for (i, src) in self.signers.iter().enumerate() {
-            let dst_array = array_mut_ref![signers_flat, 32 * i, 32];
-            dst_array.copy_from_slice(src.as_ref());
-        }
-    }
-}
+///// Multisignature data.
+//#[repr(C)]
+//#[derive(Clone, Copy, Debug, Default, PartialEq)]
+//pub struct Multisig {
+//    /// Number of signers required
+//    pub m: u8,
+//    /// Number of valid signers
+//    pub n: u8,
+//    /// Is `true` if this structure has been initialized
+//    pub is_initialized: bool,
+//    /// Signer public keys
+//    pub signers: [Pubkey; MAX_SIGNERS],
+//}
+//impl Sealed for Multisig {}
+//impl IsInitialized for Multisig {
+//    fn is_initialized(&self) -> bool {
+//        self.is_initialized
+//    }
+//}
+//impl Pack for Multisig {
+//    const LEN: usize = 355;
+//    fn unpack_from_slice(src: &[u8]) -> Result<Self, ProgramError> {
+//        let src = array_ref![src, 0, 355];
+//        #[allow(clippy::ptr_offset_with_cast)]
+//        let (m, n, is_initialized, signers_flat) = array_refs![src, 1, 1, 1, 32 * MAX_SIGNERS];
+//        let mut result = Multisig {
+//            m: m[0],
+//            n: n[0],
+//            is_initialized: match is_initialized {
+//                [0] => false,
+//                [1] => true,
+//                _ => return Err(ProgramError::InvalidAccountData),
+//            },
+//            signers: [Pubkey::new_from_array([0u8; 32]); MAX_SIGNERS],
+//        };
+//        for (src, dst) in signers_flat.chunks(32).zip(result.signers.iter_mut()) {
+//            *dst = Pubkey::new(src);
+//        }
+//        Ok(result)
+//    }
+//    fn pack_into_slice(&self, dst: &mut [u8]) {
+//        let dst = array_mut_ref![dst, 0, 355];
+//        #[allow(clippy::ptr_offset_with_cast)]
+//        let (m, n, is_initialized, signers_flat) = mut_array_refs![dst, 1, 1, 1, 32 * MAX_SIGNERS];
+//        *m = [self.m];
+//        *n = [self.n];
+//        *is_initialized = [self.is_initialized as u8];
+//        for (i, src) in self.signers.iter().enumerate() {
+//            let dst_array = array_mut_ref![signers_flat, 32 * i, 32];
+//            dst_array.copy_from_slice(src.as_ref());
+//        }
+//    }
+//}
 
 // Helpers
 fn pack_coption_key(src: &COption<Pubkey>, dst: &mut [u8; 36]) {

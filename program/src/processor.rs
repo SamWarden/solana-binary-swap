@@ -3,7 +3,7 @@
 use crate::{
     error::TokenError,
     instruction::{is_valid_signer_index, AuthorityType, TokenInstruction, MAX_SIGNERS},
-    state::{Account, AccountState, Mint, Multisig},
+    state::{Account, AccountState, Mint}, //, Multisig},
 };
 use num_traits::FromPrimitive;
 use solana_program::{
@@ -113,40 +113,40 @@ impl Processor {
         Self::_process_initialize_account(accounts, Some(&owner))
     }
 
-    /// Processes a [InitializeMultisig](enum.TokenInstruction.html) instruction.
-    pub fn process_initialize_multisig(accounts: &[AccountInfo], m: u8) -> ProgramResult {
-        let account_info_iter = &mut accounts.iter();
-        let multisig_info = next_account_info(account_info_iter)?;
-        let multisig_info_data_len = multisig_info.data_len();
-        let rent = &Rent::from_account_info(next_account_info(account_info_iter)?)?;
-
-        let mut multisig = Multisig::unpack_unchecked(&multisig_info.data.borrow())?;
-        if multisig.is_initialized {
-            return Err(TokenError::AlreadyInUse.into());
-        }
-
-        if !rent.is_exempt(multisig_info.lamports(), multisig_info_data_len) {
-            return Err(TokenError::NotRentExempt.into());
-        }
-
-        let signer_infos = account_info_iter.as_slice();
-        multisig.m = m;
-        multisig.n = signer_infos.len() as u8;
-        if !is_valid_signer_index(multisig.n as usize) {
-            return Err(TokenError::InvalidNumberOfProvidedSigners.into());
-        }
-        if !is_valid_signer_index(multisig.m as usize) {
-            return Err(TokenError::InvalidNumberOfRequiredSigners.into());
-        }
-        for (i, signer_info) in signer_infos.iter().enumerate() {
-            multisig.signers[i] = *signer_info.key;
-        }
-        multisig.is_initialized = true;
-
-        Multisig::pack(multisig, &mut multisig_info.data.borrow_mut())?;
-
-        Ok(())
-    }
+//    /// Processes a [InitializeMultisig](enum.TokenInstruction.html) instruction.
+//    pub fn process_initialize_multisig(accounts: &[AccountInfo], m: u8) -> ProgramResult {
+//        let account_info_iter = &mut accounts.iter();
+//        let multisig_info = next_account_info(account_info_iter)?;
+//        let multisig_info_data_len = multisig_info.data_len();
+//        let rent = &Rent::from_account_info(next_account_info(account_info_iter)?)?;
+//
+//        let mut multisig = Multisig::unpack_unchecked(&multisig_info.data.borrow())?;
+//        if multisig.is_initialized {
+//            return Err(TokenError::AlreadyInUse.into());
+//        }
+//
+//        if !rent.is_exempt(multisig_info.lamports(), multisig_info_data_len) {
+//            return Err(TokenError::NotRentExempt.into());
+//        }
+//
+//        let signer_infos = account_info_iter.as_slice();
+//        multisig.m = m;
+//        multisig.n = signer_infos.len() as u8;
+//        if !is_valid_signer_index(multisig.n as usize) {
+//            return Err(TokenError::InvalidNumberOfProvidedSigners.into());
+//        }
+//        if !is_valid_signer_index(multisig.m as usize) {
+//            return Err(TokenError::InvalidNumberOfRequiredSigners.into());
+//        }
+//        for (i, signer_info) in signer_infos.iter().enumerate() {
+//            multisig.signers[i] = *signer_info.key;
+//        }
+//        multisig.is_initialized = true;
+//
+//        Multisig::pack(multisig, &mut multisig_info.data.borrow_mut())?;
+//
+//        Ok(())
+//    }
 
     /// Processes a [Transfer](enum.TokenInstruction.html) instruction.
     pub fn process_transfer(
@@ -732,28 +732,28 @@ impl Processor {
     ) -> ProgramResult {
         if expected_owner != owner_account_info.key {
             return Err(TokenError::OwnerMismatch.into());
-        }
-        if program_id == owner_account_info.owner
-            && owner_account_info.data_len() == Multisig::get_packed_len()
-        {
-            let multisig = Multisig::unpack(&owner_account_info.data.borrow())?;
-            let mut num_signers = 0;
-            let mut matched = [false; MAX_SIGNERS];
-            for signer in signers.iter() {
-                for (position, key) in multisig.signers[0..multisig.n as usize].iter().enumerate() {
-                    if key == signer.key && !matched[position] {
-                        if !signer.is_signer {
-                            return Err(ProgramError::MissingRequiredSignature);
-                        }
-                        matched[position] = true;
-                        num_signers += 1;
-                    }
-                }
-            }
-            if num_signers < multisig.m {
-                return Err(ProgramError::MissingRequiredSignature);
-            }
-            return Ok(());
+//        }
+//        if program_id == owner_account_info.owner
+//            && owner_account_info.data_len() == Multisig::get_packed_len()
+//        {
+//            let multisig = Multisig::unpack(&owner_account_info.data.borrow())?;
+//            let mut num_signers = 0;
+//            let mut matched = [false; MAX_SIGNERS];
+//            for signer in signers.iter() {
+//                for (position, key) in multisig.signers[0..multisig.n as usize].iter().enumerate() {
+//                    if key == signer.key && !matched[position] {
+//                        if !signer.is_signer {
+//                            return Err(ProgramError::MissingRequiredSignature);
+//                        }
+//                        matched[position] = true;
+//                        num_signers += 1;
+//                    }
+//                }
+//            }
+//            if num_signers < multisig.m {
+//                return Err(ProgramError::MissingRequiredSignature);
+//            }
+//            return Ok(());
         } else if !owner_account_info.is_signer {
             return Err(ProgramError::MissingRequiredSignature);
         }
@@ -851,9 +851,9 @@ mod tests {
         Rent::default().minimum_balance(Account::get_packed_len())
     }
 
-    fn multisig_minimum_balance() -> u64 {
-        Rent::default().minimum_balance(Multisig::get_packed_len())
-    }
+    // fn multisig_minimum_balance() -> u64 {
+    //     Rent::default().minimum_balance(Multisig::get_packed_len())
+    // }
 
     #[test]
     fn test_print_error() {
@@ -871,10 +871,10 @@ mod tests {
     fn test_unique_account_sizes() {
         assert_ne!(Mint::get_packed_len(), 0);
         assert_ne!(Mint::get_packed_len(), Account::get_packed_len());
-        assert_ne!(Mint::get_packed_len(), Multisig::get_packed_len());
+        // assert_ne!(Mint::get_packed_len(), Multisig::get_packed_len());
         assert_ne!(Account::get_packed_len(), 0);
-        assert_ne!(Account::get_packed_len(), Multisig::get_packed_len());
-        assert_ne!(Multisig::get_packed_len(), 0);
+        // assert_ne!(Account::get_packed_len(), Multisig::get_packed_len());
+        // assert_ne!(Multisig::get_packed_len(), 0);
     }
 
     #[test]
@@ -944,42 +944,42 @@ mod tests {
         assert_eq!(unpacked, check);
 
         // Multisig
-        let check = Multisig {
-            m: 1,
-            n: 2,
-            is_initialized: true,
-            signers: [Pubkey::new(&[3; 32]); MAX_SIGNERS],
-        };
-        let mut packed = vec![0; Multisig::get_packed_len() + 1];
-        assert_eq!(
-            Err(ProgramError::InvalidAccountData),
-            Multisig::pack(check, &mut packed)
-        );
-        let mut packed = vec![0; Multisig::get_packed_len() - 1];
-        assert_eq!(
-            Err(ProgramError::InvalidAccountData),
-            Multisig::pack(check, &mut packed)
-        );
-        let mut packed = vec![0; Multisig::get_packed_len()];
-        Multisig::pack(check, &mut packed).unwrap();
-        let expect = vec![
-            1, 2, 1, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-            3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-            3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-            3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-            3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-            3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-            3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-            3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-            3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-            3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-            3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-            3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-            3, 3, 3, 3, 3, 3, 3,
-        ];
-        assert_eq!(packed, expect);
-        let unpacked = Multisig::unpack(&packed).unwrap();
-        assert_eq!(unpacked, check);
+//        let check = Multisig {
+//            m: 1,
+//            n: 2,
+//            is_initialized: true,
+//            signers: [Pubkey::new(&[3; 32]); MAX_SIGNERS],
+//        };
+//        let mut packed = vec![0; Multisig::get_packed_len() + 1];
+//        assert_eq!(
+//            Err(ProgramError::InvalidAccountData),
+//            Multisig::pack(check, &mut packed)
+//        );
+//        let mut packed = vec![0; Multisig::get_packed_len() - 1];
+//        assert_eq!(
+//            Err(ProgramError::InvalidAccountData),
+//            Multisig::pack(check, &mut packed)
+//        );
+//        let mut packed = vec![0; Multisig::get_packed_len()];
+//        Multisig::pack(check, &mut packed).unwrap();
+//        let expect = vec![
+//            1, 2, 1, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+//            3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+//            3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+//            3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+//            3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+//            3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+//            3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+//            3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+//            3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+//            3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+//            3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+//            3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+//            3, 3, 3, 3, 3, 3, 3,
+//        ];
+//        assert_eq!(packed, expect);
+//        let unpacked = Multisig::unpack(&packed).unwrap();
+//        assert_eq!(unpacked, check);
     }
 
     #[test]
@@ -1137,13 +1137,13 @@ mod tests {
             &program_id,
         );
         let account4_info: AccountInfo = (&account4_key, true, &mut account4_account).into();
-        let multisig_key = Pubkey::new_unique();
-        let mut multisig_account = SolanaAccount::new(
-            multisig_minimum_balance(),
-            Multisig::get_packed_len(),
-            &program_id,
-        );
-        let multisig_info: AccountInfo = (&multisig_key, true, &mut multisig_account).into();
+//        let multisig_key = Pubkey::new_unique();
+//        let mut multisig_account = SolanaAccount::new(
+//            multisig_minimum_balance(),
+//            Multisig::get_packed_len(),
+//            &program_id,
+//        );
+//        let multisig_info: AccountInfo = (&multisig_key, true, &mut multisig_account).into();
         let owner_key = Pubkey::new_unique();
         let mut owner_account = SolanaAccount::default();
         let owner_info: AccountInfo = (&owner_key, true, &mut owner_account).into();
@@ -1342,75 +1342,75 @@ mod tests {
         .unwrap();
 
         // test source-multisig signer
-        do_process_instruction_dups(
-            initialize_multisig(&program_id, &multisig_key, &[&account4_key], 1).unwrap(),
-            vec![
-                multisig_info.clone(),
-                rent_info.clone(),
-                account4_info.clone(),
-            ],
-        )
-        .unwrap();
+        //do_process_instruction_dups(
+        //    initialize_multisig(&program_id, &multisig_key, &[&account4_key], 1).unwrap(),
+        //    vec![
+        //        multisig_info.clone(),
+        //        rent_info.clone(),
+        //        account4_info.clone(),
+        //    ],
+        //)
+        //.unwrap();
 
-        do_process_instruction_dups(
-            initialize_account(&program_id, &account4_key, &mint_key, &multisig_key).unwrap(),
-            vec![
-                account4_info.clone(),
-                mint_info.clone(),
-                multisig_info.clone(),
-                rent_info.clone(),
-            ],
-        )
-        .unwrap();
-
-        do_process_instruction_dups(
-            mint_to(&program_id, &mint_key, &account4_key, &owner_key, &[], 1000).unwrap(),
-            vec![mint_info.clone(), account4_info.clone(), owner_info.clone()],
-        )
-        .unwrap();
-
+//        do_process_instruction_dups(
+//            initialize_account(&program_id, &account4_key, &mint_key, &multisig_key).unwrap(),
+//            vec![
+//                account4_info.clone(),
+//                mint_info.clone(),
+//                multisig_info.clone(),
+//                rent_info.clone(),
+//            ],
+//        )
+//        .unwrap();
+//
+//        do_process_instruction_dups(
+//            mint_to(&program_id, &mint_key, &account4_key, &owner_key, &[], 1000).unwrap(),
+//            vec![mint_info.clone(), account4_info.clone(), owner_info.clone()],
+//        )
+//        .unwrap();
+//
         // source-multisig-signer transfer
-        do_process_instruction_dups(
-            transfer(
-                &program_id,
-                &account4_key,
-                &account2_key,
-                &multisig_key,
-                &[&account4_key],
-                500,
-            )
-            .unwrap(),
-            vec![
-                account4_info.clone(),
-                account2_info.clone(),
-                multisig_info.clone(),
-                account4_info.clone(),
-            ],
-        )
-        .unwrap();
+//        do_process_instruction_dups(
+//            transfer(
+//                &program_id,
+//                &account4_key,
+//                &account2_key,
+////                &multisig_key,
+//                &[&account4_key],
+//                500,
+//            )
+//            .unwrap(),
+//            vec![
+//                account4_info.clone(),
+//                account2_info.clone(),
+////                multisig_info.clone(),
+//                account4_info.clone(),
+//            ],
+//        )
+//        .unwrap();
 
         // source-multisig-signer TransferChecked
-        do_process_instruction_dups(
-            transfer_checked(
-                &program_id,
-                &account4_key,
-                &mint_key,
-                &account2_key,
-                &multisig_key,
-                &[&account4_key],
-                500,
-                2,
-            )
-            .unwrap(),
-            vec![
-                account4_info.clone(),
-                mint_info.clone(),
-                account2_info.clone(),
-                multisig_info.clone(),
-                account4_info.clone(),
-            ],
-        )
-        .unwrap();
+//        do_process_instruction_dups(
+//            transfer_checked(
+//                &program_id,
+//                &account4_key,
+//                &mint_key,
+//                &account2_key,
+////                &multisig_key,
+//                &[&account4_key],
+//                500,
+//                2,
+//            )
+//            .unwrap(),
+//            vec![
+//                account4_info.clone(),
+//                mint_info.clone(),
+//                account2_info.clone(),
+////                multisig_info.clone(),
+//                account4_info.clone(),
+//            ],
+//        )
+//        .unwrap();
     }
 
     #[test]
@@ -2487,13 +2487,13 @@ mod tests {
             &program_id,
         );
         let account3_info: AccountInfo = (&account3_key, true, &mut account3_account).into();
-        let multisig_key = Pubkey::new_unique();
-        let mut multisig_account = SolanaAccount::new(
-            multisig_minimum_balance(),
-            Multisig::get_packed_len(),
-            &program_id,
-        );
-        let multisig_info: AccountInfo = (&multisig_key, true, &mut multisig_account).into();
+//        let multisig_key = Pubkey::new_unique();
+//        let mut multisig_account = SolanaAccount::new(
+//            multisig_minimum_balance(),
+//            Multisig::get_packed_len(),
+//            &program_id,
+//        );
+//        let multisig_info: AccountInfo = (&multisig_key, true, &mut multisig_account).into();
         let owner_key = Pubkey::new_unique();
         let mut owner_account = SolanaAccount::default();
         let owner_info: AccountInfo = (&owner_key, true, &mut owner_account).into();
@@ -2592,86 +2592,86 @@ mod tests {
         .unwrap();
 
         // test source-multisig signer
-        do_process_instruction_dups(
-            initialize_multisig(&program_id, &multisig_key, &[&account3_key], 1).unwrap(),
-            vec![
-                multisig_info.clone(),
-                rent_info.clone(),
-                account3_info.clone(),
-            ],
-        )
-        .unwrap();
+        //do_process_instruction_dups(
+        //    initialize_multisig(&program_id, &multisig_key, &[&account3_key], 1).unwrap(),
+        //    vec![
+        //        multisig_info.clone(),
+        //        rent_info.clone(),
+        //        account3_info.clone(),
+        //    ],
+        //)
+        //.unwrap();
 
-        do_process_instruction_dups(
-            initialize_account(&program_id, &account3_key, &mint_key, &multisig_key).unwrap(),
-            vec![
-                account3_info.clone(),
-                mint_info.clone(),
-                multisig_info.clone(),
-                rent_info.clone(),
-            ],
-        )
-        .unwrap();
-
-        do_process_instruction_dups(
-            mint_to(&program_id, &mint_key, &account3_key, &owner_key, &[], 1000).unwrap(),
-            vec![mint_info.clone(), account3_info.clone(), owner_info.clone()],
-        )
-        .unwrap();
-
-        // source-multisig-signer approve
-        do_process_instruction_dups(
-            approve(
-                &program_id,
-                &account3_key,
-                &account2_key,
-                &multisig_key,
-                &[&account3_key],
-                500,
-            )
-            .unwrap(),
-            vec![
-                account3_info.clone(),
-                account2_info.clone(),
-                multisig_info.clone(),
-                account3_info.clone(),
-            ],
-        )
-        .unwrap();
-
-        // source-multisig-signer approve_checked
-        do_process_instruction_dups(
-            approve_checked(
-                &program_id,
-                &account3_key,
-                &mint_key,
-                &account2_key,
-                &multisig_key,
-                &[&account3_key],
-                500,
-                2,
-            )
-            .unwrap(),
-            vec![
-                account3_info.clone(),
-                mint_info.clone(),
-                account2_info.clone(),
-                multisig_info.clone(),
-                account3_info.clone(),
-            ],
-        )
-        .unwrap();
+//        do_process_instruction_dups(
+//            initialize_account(&program_id, &account3_key, &mint_key, &multisig_key).unwrap(),
+//            vec![
+//                account3_info.clone(),
+//                mint_info.clone(),
+//                multisig_info.clone(),
+//                rent_info.clone(),
+//            ],
+//        )
+//        .unwrap();
+//
+//        do_process_instruction_dups(
+//            mint_to(&program_id, &mint_key, &account3_key, &owner_key, &[], 1000).unwrap(),
+//            vec![mint_info.clone(), account3_info.clone(), owner_info.clone()],
+//        )
+//        .unwrap();
+//
+//        // source-multisig-signer approve
+//        do_process_instruction_dups(
+//            approve(
+//                &program_id,
+//                &account3_key,
+//                &account2_key,
+////                &multisig_key,
+//                &[&account3_key],
+//                500,
+//            )
+//            .unwrap(),
+//            vec![
+//                account3_info.clone(),
+//                account2_info.clone(),
+////                multisig_info.clone(),
+//                account3_info.clone(),
+//            ],
+//        )
+//        .unwrap();
+//
+//        // source-multisig-signer approve_checked
+//        do_process_instruction_dups(
+//            approve_checked(
+//                &program_id,
+//                &account3_key,
+//                &mint_key,
+//                &account2_key,
+////                &multisig_key,
+//                &[&account3_key],
+//                500,
+//                2,
+//            )
+//            .unwrap(),
+//            vec![
+//                account3_info.clone(),
+//                mint_info.clone(),
+//                account2_info.clone(),
+////                multisig_info.clone(),
+//                account3_info.clone(),
+//            ],
+//        )
+//        .unwrap();
 
         // source-owner multisig-signer
-        do_process_instruction_dups(
-            revoke(&program_id, &account3_key, &multisig_key, &[&account3_key]).unwrap(),
-            vec![
-                account3_info.clone(),
-                multisig_info.clone(),
-                account3_info.clone(),
-            ],
-        )
-        .unwrap();
+//        do_process_instruction_dups(
+//            revoke(&program_id, &account3_key, &multisig_key, &[&account3_key]).unwrap(),
+//            vec![
+//                account3_info.clone(),
+//                multisig_info.clone(),
+//                account3_info.clone(),
+//            ],
+//        )
+//        .unwrap();
     }
 
     #[test]
@@ -4085,569 +4085,569 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_multisig() {
-        let program_id = Pubkey::new_unique();
-        let mint_key = Pubkey::new_unique();
-        let mut mint_account =
-            SolanaAccount::new(mint_minimum_balance(), Mint::get_packed_len(), &program_id);
-        let account_key = Pubkey::new_unique();
-        let mut account = SolanaAccount::new(
-            account_minimum_balance(),
-            Account::get_packed_len(),
-            &program_id,
-        );
-        let account2_key = Pubkey::new_unique();
-        let mut account2_account = SolanaAccount::new(
-            account_minimum_balance(),
-            Account::get_packed_len(),
-            &program_id,
-        );
-        let owner_key = Pubkey::new_unique();
-        let mut owner_account = SolanaAccount::default();
-        let multisig_key = Pubkey::new_unique();
-        let mut multisig_account = SolanaAccount::new(42, Multisig::get_packed_len(), &program_id);
-        let multisig_delegate_key = Pubkey::new_unique();
-        let mut multisig_delegate_account = SolanaAccount::new(
-            multisig_minimum_balance(),
-            Multisig::get_packed_len(),
-            &program_id,
-        );
-        let signer_keys = vec![Pubkey::new_unique(); MAX_SIGNERS];
-        let signer_key_refs: Vec<&Pubkey> = signer_keys.iter().collect();
-        let mut signer_accounts = vec![SolanaAccount::new(0, 0, &program_id); MAX_SIGNERS];
-        let mut rent_sysvar = rent_sysvar();
+//    #[test]
+//    fn test_multisig() {
+//        let program_id = Pubkey::new_unique();
+//        let mint_key = Pubkey::new_unique();
+//        let mut mint_account =
+//            SolanaAccount::new(mint_minimum_balance(), Mint::get_packed_len(), &program_id);
+//        let account_key = Pubkey::new_unique();
+//        let mut account = SolanaAccount::new(
+//            account_minimum_balance(),
+//            Account::get_packed_len(),
+//            &program_id,
+//        );
+//        let account2_key = Pubkey::new_unique();
+//        let mut account2_account = SolanaAccount::new(
+//            account_minimum_balance(),
+//            Account::get_packed_len(),
+//            &program_id,
+//        );
+//        let owner_key = Pubkey::new_unique();
+//        let mut owner_account = SolanaAccount::default();
+//        let multisig_key = Pubkey::new_unique();
+//        let mut multisig_account = SolanaAccount::new(42, Multisig::get_packed_len(), &program_id);
+//        let multisig_delegate_key = Pubkey::new_unique();
+//        let mut multisig_delegate_account = SolanaAccount::new(
+//            multisig_minimum_balance(),
+//            Multisig::get_packed_len(),
+//            &program_id,
+//        );
+//        let signer_keys = vec![Pubkey::new_unique(); MAX_SIGNERS];
+//        let signer_key_refs: Vec<&Pubkey> = signer_keys.iter().collect();
+//        let mut signer_accounts = vec![SolanaAccount::new(0, 0, &program_id); MAX_SIGNERS];
+//        let mut rent_sysvar = rent_sysvar();
+//
+//        // multisig is not rent exempt
+//        let account_info_iter = &mut signer_accounts.iter_mut();
+//        assert_eq!(
+//            Err(TokenError::NotRentExempt.into()),
+//            do_process_instruction(
+//                initialize_multisig(&program_id, &multisig_key, &[&signer_keys[0]], 1).unwrap(),
+//                vec![
+//                    &mut multisig_account,
+//                    &mut rent_sysvar,
+//                    &mut account_info_iter.next().unwrap(),
+//                ],
+//            )
+//        );
+//
+//        multisig_account.lamports = multisig_minimum_balance();
+//
+//        // single signer
+//        let account_info_iter = &mut signer_accounts.iter_mut();
+//        do_process_instruction(
+//            initialize_multisig(&program_id, &multisig_key, &[&signer_keys[0]], 1).unwrap(),
+//            vec![
+//                &mut multisig_account,
+//                &mut rent_sysvar,
+//                &mut account_info_iter.next().unwrap(),
+//            ],
+//        )
+//        .unwrap();
+//
+//        // multiple signer
+//        let account_info_iter = &mut signer_accounts.iter_mut();
+//        do_process_instruction(
+//            initialize_multisig(
+//                &program_id,
+//                &multisig_delegate_key,
+//                &signer_key_refs,
+//                MAX_SIGNERS as u8,
+//            )
+//            .unwrap(),
+//            vec![
+//                &mut multisig_delegate_account,
+//                &mut rent_sysvar,
+//                &mut account_info_iter.next().unwrap(),
+//                &mut account_info_iter.next().unwrap(),
+//                &mut account_info_iter.next().unwrap(),
+//                &mut account_info_iter.next().unwrap(),
+//                &mut account_info_iter.next().unwrap(),
+//                &mut account_info_iter.next().unwrap(),
+//                &mut account_info_iter.next().unwrap(),
+//                &mut account_info_iter.next().unwrap(),
+//                &mut account_info_iter.next().unwrap(),
+//                &mut account_info_iter.next().unwrap(),
+//                &mut account_info_iter.next().unwrap(),
+//            ],
+//        )
+//        .unwrap();
+//
+//        // create new mint with multisig owner
+//        do_process_instruction(
+//            initialize_mint(&program_id, &mint_key, &multisig_key, None, 2).unwrap(),
+//            vec![&mut mint_account, &mut rent_sysvar],
+//        )
+//        .unwrap();
+//
+//        // create account with multisig owner
+//        do_process_instruction(
+//            initialize_account(&program_id, &account_key, &mint_key, &multisig_key).unwrap(),
+//            vec![
+//                &mut account,
+//                &mut mint_account,
+//                &mut multisig_account,
+//                &mut rent_sysvar,
+//            ],
+//        )
+//        .unwrap();
+//
+//        // create another account with multisig owner
+//        do_process_instruction(
+//            initialize_account(
+//                &program_id,
+//                &account2_key,
+//                &mint_key,
+//                &multisig_delegate_key,
+//            )
+//            .unwrap(),
+//            vec![
+//                &mut account2_account,
+//                &mut mint_account,
+//                &mut multisig_account,
+//                &mut rent_sysvar,
+//            ],
+//        )
+//        .unwrap();
+//
+//        // mint to account
+//        let account_info_iter = &mut signer_accounts.iter_mut();
+//        do_process_instruction(
+//            mint_to(
+//                &program_id,
+//                &mint_key,
+//                &account_key,
+//                &multisig_key,
+//                &[&signer_keys[0]],
+//                1000,
+//            )
+//            .unwrap(),
+//            vec![
+//                &mut mint_account,
+//                &mut account,
+//                &mut multisig_account,
+//                &mut account_info_iter.next().unwrap(),
+//            ],
+//        )
+//        .unwrap();
+//
+//        // approve
+//        let account_info_iter = &mut signer_accounts.iter_mut();
+//        do_process_instruction(
+//            approve(
+//                &program_id,
+//                &account_key,
+//                &multisig_delegate_key,
+//                &multisig_key,
+//                &[&signer_keys[0]],
+//                100,
+//            )
+//            .unwrap(),
+//            vec![
+//                &mut account,
+//                &mut multisig_delegate_account,
+//                &mut multisig_account,
+//                &mut account_info_iter.next().unwrap(),
+//            ],
+//        )
+//        .unwrap();
+//
+//        // transfer
+//        let account_info_iter = &mut signer_accounts.iter_mut();
+//        do_process_instruction(
+//            transfer(
+//                &program_id,
+//                &account_key,
+//                &account2_key,
+//                &multisig_key,
+//                &[&signer_keys[0]],
+//                42,
+//            )
+//            .unwrap(),
+//            vec![
+//                &mut account,
+//                &mut account2_account,
+//                &mut multisig_account,
+//                &mut account_info_iter.next().unwrap(),
+//            ],
+//        )
+//        .unwrap();
+//
+//        // transfer via delegate
+//        let account_info_iter = &mut signer_accounts.iter_mut();
+//        do_process_instruction(
+//            transfer(
+//                &program_id,
+//                &account_key,
+//                &account2_key,
+//                &multisig_delegate_key,
+//                &signer_key_refs,
+//                42,
+//            )
+//            .unwrap(),
+//            vec![
+//                &mut account,
+//                &mut account2_account,
+//                &mut multisig_delegate_account,
+//                &mut account_info_iter.next().unwrap(),
+//                &mut account_info_iter.next().unwrap(),
+//                &mut account_info_iter.next().unwrap(),
+//                &mut account_info_iter.next().unwrap(),
+//                &mut account_info_iter.next().unwrap(),
+//                &mut account_info_iter.next().unwrap(),
+//                &mut account_info_iter.next().unwrap(),
+//                &mut account_info_iter.next().unwrap(),
+//                &mut account_info_iter.next().unwrap(),
+//                &mut account_info_iter.next().unwrap(),
+//                &mut account_info_iter.next().unwrap(),
+//            ],
+//        )
+//        .unwrap();
+//
+//        // mint to
+//        let account_info_iter = &mut signer_accounts.iter_mut();
+//        do_process_instruction(
+//            mint_to(
+//                &program_id,
+//                &mint_key,
+//                &account2_key,
+//                &multisig_key,
+//                &[&signer_keys[0]],
+//                42,
+//            )
+//            .unwrap(),
+//            vec![
+//                &mut mint_account,
+//                &mut account2_account,
+//                &mut multisig_account,
+//                &mut account_info_iter.next().unwrap(),
+//            ],
+//        )
+//        .unwrap();
+//
+//        // burn
+//        let account_info_iter = &mut signer_accounts.iter_mut();
+//        do_process_instruction(
+//            burn(
+//                &program_id,
+//                &account_key,
+//                &mint_key,
+//                &multisig_key,
+//                &[&signer_keys[0]],
+//                42,
+//            )
+//            .unwrap(),
+//            vec![
+//                &mut account,
+//                &mut mint_account,
+//                &mut multisig_account,
+//                &mut account_info_iter.next().unwrap(),
+//            ],
+//        )
+//        .unwrap();
+//
+//        // burn via delegate
+//        let account_info_iter = &mut signer_accounts.iter_mut();
+//        do_process_instruction(
+//            burn(
+//                &program_id,
+//                &account_key,
+//                &mint_key,
+//                &multisig_delegate_key,
+//                &signer_key_refs,
+//                42,
+//            )
+//            .unwrap(),
+//            vec![
+//                &mut account,
+//                &mut mint_account,
+//                &mut multisig_delegate_account,
+//                &mut account_info_iter.next().unwrap(),
+//                &mut account_info_iter.next().unwrap(),
+//                &mut account_info_iter.next().unwrap(),
+//                &mut account_info_iter.next().unwrap(),
+//                &mut account_info_iter.next().unwrap(),
+//                &mut account_info_iter.next().unwrap(),
+//                &mut account_info_iter.next().unwrap(),
+//                &mut account_info_iter.next().unwrap(),
+//                &mut account_info_iter.next().unwrap(),
+//                &mut account_info_iter.next().unwrap(),
+//                &mut account_info_iter.next().unwrap(),
+//            ],
+//        )
+//        .unwrap();
+//
+//        // freeze account
+//        let account3_key = Pubkey::new_unique();
+//        let mut account3_account = SolanaAccount::new(
+//            account_minimum_balance(),
+//            Account::get_packed_len(),
+//            &program_id,
+//        );
+//        let mint2_key = Pubkey::new_unique();
+//        let mut mint2_account =
+//            SolanaAccount::new(mint_minimum_balance(), Mint::get_packed_len(), &program_id);
+//        do_process_instruction(
+//            initialize_mint(
+//                &program_id,
+//                &mint2_key,
+//                &multisig_key,
+//                Some(&multisig_key),
+//                2,
+//            )
+//            .unwrap(),
+//            vec![&mut mint2_account, &mut rent_sysvar],
+//        )
+//        .unwrap();
+//        do_process_instruction(
+//            initialize_account(&program_id, &account3_key, &mint2_key, &owner_key).unwrap(),
+//            vec![
+//                &mut account3_account,
+//                &mut mint2_account,
+//                &mut owner_account,
+//                &mut rent_sysvar,
+//            ],
+//        )
+//        .unwrap();
+//        let account_info_iter = &mut signer_accounts.iter_mut();
+//        do_process_instruction(
+//            mint_to(
+//                &program_id,
+//                &mint2_key,
+//                &account3_key,
+//                &multisig_key,
+//                &[&signer_keys[0]],
+//                1000,
+//            )
+//            .unwrap(),
+//            vec![
+//                &mut mint2_account,
+//                &mut account3_account,
+//                &mut multisig_account,
+//                &mut account_info_iter.next().unwrap(),
+//            ],
+//        )
+//        .unwrap();
+//        let account_info_iter = &mut signer_accounts.iter_mut();
+//        do_process_instruction(
+//            freeze_account(
+//                &program_id,
+//                &account3_key,
+//                &mint2_key,
+//                &multisig_key,
+//                &[&signer_keys[0]],
+//            )
+//            .unwrap(),
+//            vec![
+//                &mut account3_account,
+//                &mut mint2_account,
+//                &mut multisig_account,
+//                &mut account_info_iter.next().unwrap(),
+//            ],
+//        )
+//        .unwrap();
+//
+//        // do SetAuthority on mint
+//        let account_info_iter = &mut signer_accounts.iter_mut();
+//        do_process_instruction(
+//            set_authority(
+//                &program_id,
+//                &mint_key,
+//                Some(&owner_key),
+//                AuthorityType::MintTokens,
+//                &multisig_key,
+//                &[&signer_keys[0]],
+//            )
+//            .unwrap(),
+//            vec![
+//                &mut mint_account,
+//                &mut multisig_account,
+//                &mut account_info_iter.next().unwrap(),
+//            ],
+//        )
+//        .unwrap();
+//
+//        // do SetAuthority on account
+//        let account_info_iter = &mut signer_accounts.iter_mut();
+//        do_process_instruction(
+//            set_authority(
+//                &program_id,
+//                &account_key,
+//                Some(&owner_key),
+//                AuthorityType::AccountOwner,
+//                &multisig_key,
+//                &[&signer_keys[0]],
+//            )
+//            .unwrap(),
+//            vec![
+//                &mut account,
+//                &mut multisig_account,
+//                &mut account_info_iter.next().unwrap(),
+//            ],
+//        )
+//        .unwrap();
+//    }
 
-        // multisig is not rent exempt
-        let account_info_iter = &mut signer_accounts.iter_mut();
-        assert_eq!(
-            Err(TokenError::NotRentExempt.into()),
-            do_process_instruction(
-                initialize_multisig(&program_id, &multisig_key, &[&signer_keys[0]], 1).unwrap(),
-                vec![
-                    &mut multisig_account,
-                    &mut rent_sysvar,
-                    &mut account_info_iter.next().unwrap(),
-                ],
-            )
-        );
-
-        multisig_account.lamports = multisig_minimum_balance();
-
-        // single signer
-        let account_info_iter = &mut signer_accounts.iter_mut();
-        do_process_instruction(
-            initialize_multisig(&program_id, &multisig_key, &[&signer_keys[0]], 1).unwrap(),
-            vec![
-                &mut multisig_account,
-                &mut rent_sysvar,
-                &mut account_info_iter.next().unwrap(),
-            ],
-        )
-        .unwrap();
-
-        // multiple signer
-        let account_info_iter = &mut signer_accounts.iter_mut();
-        do_process_instruction(
-            initialize_multisig(
-                &program_id,
-                &multisig_delegate_key,
-                &signer_key_refs,
-                MAX_SIGNERS as u8,
-            )
-            .unwrap(),
-            vec![
-                &mut multisig_delegate_account,
-                &mut rent_sysvar,
-                &mut account_info_iter.next().unwrap(),
-                &mut account_info_iter.next().unwrap(),
-                &mut account_info_iter.next().unwrap(),
-                &mut account_info_iter.next().unwrap(),
-                &mut account_info_iter.next().unwrap(),
-                &mut account_info_iter.next().unwrap(),
-                &mut account_info_iter.next().unwrap(),
-                &mut account_info_iter.next().unwrap(),
-                &mut account_info_iter.next().unwrap(),
-                &mut account_info_iter.next().unwrap(),
-                &mut account_info_iter.next().unwrap(),
-            ],
-        )
-        .unwrap();
-
-        // create new mint with multisig owner
-        do_process_instruction(
-            initialize_mint(&program_id, &mint_key, &multisig_key, None, 2).unwrap(),
-            vec![&mut mint_account, &mut rent_sysvar],
-        )
-        .unwrap();
-
-        // create account with multisig owner
-        do_process_instruction(
-            initialize_account(&program_id, &account_key, &mint_key, &multisig_key).unwrap(),
-            vec![
-                &mut account,
-                &mut mint_account,
-                &mut multisig_account,
-                &mut rent_sysvar,
-            ],
-        )
-        .unwrap();
-
-        // create another account with multisig owner
-        do_process_instruction(
-            initialize_account(
-                &program_id,
-                &account2_key,
-                &mint_key,
-                &multisig_delegate_key,
-            )
-            .unwrap(),
-            vec![
-                &mut account2_account,
-                &mut mint_account,
-                &mut multisig_account,
-                &mut rent_sysvar,
-            ],
-        )
-        .unwrap();
-
-        // mint to account
-        let account_info_iter = &mut signer_accounts.iter_mut();
-        do_process_instruction(
-            mint_to(
-                &program_id,
-                &mint_key,
-                &account_key,
-                &multisig_key,
-                &[&signer_keys[0]],
-                1000,
-            )
-            .unwrap(),
-            vec![
-                &mut mint_account,
-                &mut account,
-                &mut multisig_account,
-                &mut account_info_iter.next().unwrap(),
-            ],
-        )
-        .unwrap();
-
-        // approve
-        let account_info_iter = &mut signer_accounts.iter_mut();
-        do_process_instruction(
-            approve(
-                &program_id,
-                &account_key,
-                &multisig_delegate_key,
-                &multisig_key,
-                &[&signer_keys[0]],
-                100,
-            )
-            .unwrap(),
-            vec![
-                &mut account,
-                &mut multisig_delegate_account,
-                &mut multisig_account,
-                &mut account_info_iter.next().unwrap(),
-            ],
-        )
-        .unwrap();
-
-        // transfer
-        let account_info_iter = &mut signer_accounts.iter_mut();
-        do_process_instruction(
-            transfer(
-                &program_id,
-                &account_key,
-                &account2_key,
-                &multisig_key,
-                &[&signer_keys[0]],
-                42,
-            )
-            .unwrap(),
-            vec![
-                &mut account,
-                &mut account2_account,
-                &mut multisig_account,
-                &mut account_info_iter.next().unwrap(),
-            ],
-        )
-        .unwrap();
-
-        // transfer via delegate
-        let account_info_iter = &mut signer_accounts.iter_mut();
-        do_process_instruction(
-            transfer(
-                &program_id,
-                &account_key,
-                &account2_key,
-                &multisig_delegate_key,
-                &signer_key_refs,
-                42,
-            )
-            .unwrap(),
-            vec![
-                &mut account,
-                &mut account2_account,
-                &mut multisig_delegate_account,
-                &mut account_info_iter.next().unwrap(),
-                &mut account_info_iter.next().unwrap(),
-                &mut account_info_iter.next().unwrap(),
-                &mut account_info_iter.next().unwrap(),
-                &mut account_info_iter.next().unwrap(),
-                &mut account_info_iter.next().unwrap(),
-                &mut account_info_iter.next().unwrap(),
-                &mut account_info_iter.next().unwrap(),
-                &mut account_info_iter.next().unwrap(),
-                &mut account_info_iter.next().unwrap(),
-                &mut account_info_iter.next().unwrap(),
-            ],
-        )
-        .unwrap();
-
-        // mint to
-        let account_info_iter = &mut signer_accounts.iter_mut();
-        do_process_instruction(
-            mint_to(
-                &program_id,
-                &mint_key,
-                &account2_key,
-                &multisig_key,
-                &[&signer_keys[0]],
-                42,
-            )
-            .unwrap(),
-            vec![
-                &mut mint_account,
-                &mut account2_account,
-                &mut multisig_account,
-                &mut account_info_iter.next().unwrap(),
-            ],
-        )
-        .unwrap();
-
-        // burn
-        let account_info_iter = &mut signer_accounts.iter_mut();
-        do_process_instruction(
-            burn(
-                &program_id,
-                &account_key,
-                &mint_key,
-                &multisig_key,
-                &[&signer_keys[0]],
-                42,
-            )
-            .unwrap(),
-            vec![
-                &mut account,
-                &mut mint_account,
-                &mut multisig_account,
-                &mut account_info_iter.next().unwrap(),
-            ],
-        )
-        .unwrap();
-
-        // burn via delegate
-        let account_info_iter = &mut signer_accounts.iter_mut();
-        do_process_instruction(
-            burn(
-                &program_id,
-                &account_key,
-                &mint_key,
-                &multisig_delegate_key,
-                &signer_key_refs,
-                42,
-            )
-            .unwrap(),
-            vec![
-                &mut account,
-                &mut mint_account,
-                &mut multisig_delegate_account,
-                &mut account_info_iter.next().unwrap(),
-                &mut account_info_iter.next().unwrap(),
-                &mut account_info_iter.next().unwrap(),
-                &mut account_info_iter.next().unwrap(),
-                &mut account_info_iter.next().unwrap(),
-                &mut account_info_iter.next().unwrap(),
-                &mut account_info_iter.next().unwrap(),
-                &mut account_info_iter.next().unwrap(),
-                &mut account_info_iter.next().unwrap(),
-                &mut account_info_iter.next().unwrap(),
-                &mut account_info_iter.next().unwrap(),
-            ],
-        )
-        .unwrap();
-
-        // freeze account
-        let account3_key = Pubkey::new_unique();
-        let mut account3_account = SolanaAccount::new(
-            account_minimum_balance(),
-            Account::get_packed_len(),
-            &program_id,
-        );
-        let mint2_key = Pubkey::new_unique();
-        let mut mint2_account =
-            SolanaAccount::new(mint_minimum_balance(), Mint::get_packed_len(), &program_id);
-        do_process_instruction(
-            initialize_mint(
-                &program_id,
-                &mint2_key,
-                &multisig_key,
-                Some(&multisig_key),
-                2,
-            )
-            .unwrap(),
-            vec![&mut mint2_account, &mut rent_sysvar],
-        )
-        .unwrap();
-        do_process_instruction(
-            initialize_account(&program_id, &account3_key, &mint2_key, &owner_key).unwrap(),
-            vec![
-                &mut account3_account,
-                &mut mint2_account,
-                &mut owner_account,
-                &mut rent_sysvar,
-            ],
-        )
-        .unwrap();
-        let account_info_iter = &mut signer_accounts.iter_mut();
-        do_process_instruction(
-            mint_to(
-                &program_id,
-                &mint2_key,
-                &account3_key,
-                &multisig_key,
-                &[&signer_keys[0]],
-                1000,
-            )
-            .unwrap(),
-            vec![
-                &mut mint2_account,
-                &mut account3_account,
-                &mut multisig_account,
-                &mut account_info_iter.next().unwrap(),
-            ],
-        )
-        .unwrap();
-        let account_info_iter = &mut signer_accounts.iter_mut();
-        do_process_instruction(
-            freeze_account(
-                &program_id,
-                &account3_key,
-                &mint2_key,
-                &multisig_key,
-                &[&signer_keys[0]],
-            )
-            .unwrap(),
-            vec![
-                &mut account3_account,
-                &mut mint2_account,
-                &mut multisig_account,
-                &mut account_info_iter.next().unwrap(),
-            ],
-        )
-        .unwrap();
-
-        // do SetAuthority on mint
-        let account_info_iter = &mut signer_accounts.iter_mut();
-        do_process_instruction(
-            set_authority(
-                &program_id,
-                &mint_key,
-                Some(&owner_key),
-                AuthorityType::MintTokens,
-                &multisig_key,
-                &[&signer_keys[0]],
-            )
-            .unwrap(),
-            vec![
-                &mut mint_account,
-                &mut multisig_account,
-                &mut account_info_iter.next().unwrap(),
-            ],
-        )
-        .unwrap();
-
-        // do SetAuthority on account
-        let account_info_iter = &mut signer_accounts.iter_mut();
-        do_process_instruction(
-            set_authority(
-                &program_id,
-                &account_key,
-                Some(&owner_key),
-                AuthorityType::AccountOwner,
-                &multisig_key,
-                &[&signer_keys[0]],
-            )
-            .unwrap(),
-            vec![
-                &mut account,
-                &mut multisig_account,
-                &mut account_info_iter.next().unwrap(),
-            ],
-        )
-        .unwrap();
-    }
-
-    #[test]
-    fn test_validate_owner() {
-        let program_id = Pubkey::new_unique();
-        let owner_key = Pubkey::new_unique();
-        let mut signer_keys = [Pubkey::default(); MAX_SIGNERS];
-        for signer_key in signer_keys.iter_mut().take(MAX_SIGNERS) {
-            *signer_key = Pubkey::new_unique();
-        }
-        let mut signer_lamports = 0;
-        let mut signer_data = vec![];
-        let mut signers = vec![
-            AccountInfo::new(
-                &owner_key,
-                true,
-                false,
-                &mut signer_lamports,
-                &mut signer_data,
-                &program_id,
-                false,
-                Epoch::default(),
-            );
-            MAX_SIGNERS + 1
-        ];
-        for (signer, key) in signers.iter_mut().zip(&signer_keys) {
-            signer.key = key;
-        }
-        let mut lamports = 0;
-        let mut data = vec![0; Multisig::get_packed_len()];
-        let mut multisig = Multisig::unpack_unchecked(&data).unwrap();
-        multisig.m = MAX_SIGNERS as u8;
-        multisig.n = MAX_SIGNERS as u8;
-        multisig.signers = signer_keys;
-        multisig.is_initialized = true;
-        Multisig::pack(multisig, &mut data).unwrap();
-        let owner_account_info = AccountInfo::new(
-            &owner_key,
-            false,
-            false,
-            &mut lamports,
-            &mut data,
-            &program_id,
-            false,
-            Epoch::default(),
-        );
-
-        // full 11 of 11
-        Processor::validate_owner(&program_id, &owner_key, &owner_account_info, &signers).unwrap();
-
-        // 1 of 11
-        {
-            let mut multisig =
-                Multisig::unpack_unchecked(&owner_account_info.data.borrow()).unwrap();
-            multisig.m = 1;
-            Multisig::pack(multisig, &mut owner_account_info.data.borrow_mut()).unwrap();
-        }
-        Processor::validate_owner(&program_id, &owner_key, &owner_account_info, &signers).unwrap();
-
-        // 2:1
-        {
-            let mut multisig =
-                Multisig::unpack_unchecked(&owner_account_info.data.borrow()).unwrap();
-            multisig.m = 2;
-            multisig.n = 1;
-            Multisig::pack(multisig, &mut owner_account_info.data.borrow_mut()).unwrap();
-        }
-        assert_eq!(
-            Err(ProgramError::MissingRequiredSignature),
-            Processor::validate_owner(&program_id, &owner_key, &owner_account_info, &signers)
-        );
-
-        // 0:11
-        {
-            let mut multisig =
-                Multisig::unpack_unchecked(&owner_account_info.data.borrow()).unwrap();
-            multisig.m = 0;
-            multisig.n = 11;
-            Multisig::pack(multisig, &mut owner_account_info.data.borrow_mut()).unwrap();
-        }
-        Processor::validate_owner(&program_id, &owner_key, &owner_account_info, &signers).unwrap();
-
-        // 2:11 but 0 provided
-        {
-            let mut multisig =
-                Multisig::unpack_unchecked(&owner_account_info.data.borrow()).unwrap();
-            multisig.m = 2;
-            multisig.n = 11;
-            Multisig::pack(multisig, &mut owner_account_info.data.borrow_mut()).unwrap();
-        }
-        assert_eq!(
-            Err(ProgramError::MissingRequiredSignature),
-            Processor::validate_owner(&program_id, &owner_key, &owner_account_info, &[])
-        );
-        // 2:11 but 1 provided
-        {
-            let mut multisig =
-                Multisig::unpack_unchecked(&owner_account_info.data.borrow()).unwrap();
-            multisig.m = 2;
-            multisig.n = 11;
-            Multisig::pack(multisig, &mut owner_account_info.data.borrow_mut()).unwrap();
-        }
-        assert_eq!(
-            Err(ProgramError::MissingRequiredSignature),
-            Processor::validate_owner(&program_id, &owner_key, &owner_account_info, &signers[0..1])
-        );
-
-        // 2:11, 2 from middle provided
-        {
-            let mut multisig =
-                Multisig::unpack_unchecked(&owner_account_info.data.borrow()).unwrap();
-            multisig.m = 2;
-            multisig.n = 11;
-            Multisig::pack(multisig, &mut owner_account_info.data.borrow_mut()).unwrap();
-        }
-        Processor::validate_owner(&program_id, &owner_key, &owner_account_info, &signers[5..7])
-            .unwrap();
-
-        // 11:11, one is not a signer
-        {
-            let mut multisig =
-                Multisig::unpack_unchecked(&owner_account_info.data.borrow()).unwrap();
-            multisig.m = 11;
-            multisig.n = 11;
-            Multisig::pack(multisig, &mut owner_account_info.data.borrow_mut()).unwrap();
-        }
-        signers[5].is_signer = false;
-        assert_eq!(
-            Err(ProgramError::MissingRequiredSignature),
-            Processor::validate_owner(&program_id, &owner_key, &owner_account_info, &signers)
-        );
-        signers[5].is_signer = true;
-
-        // 11:11, single signer signs multiple times
-        {
-            let mut signer_lamports = 0;
-            let mut signer_data = vec![];
-            let signers = vec![
-                AccountInfo::new(
-                    &signer_keys[5],
-                    true,
-                    false,
-                    &mut signer_lamports,
-                    &mut signer_data,
-                    &program_id,
-                    false,
-                    Epoch::default(),
-                );
-                MAX_SIGNERS + 1
-            ];
-            let mut multisig =
-                Multisig::unpack_unchecked(&owner_account_info.data.borrow()).unwrap();
-            multisig.m = 11;
-            multisig.n = 11;
-            Multisig::pack(multisig, &mut owner_account_info.data.borrow_mut()).unwrap();
-            assert_eq!(
-                Err(ProgramError::MissingRequiredSignature),
-                Processor::validate_owner(&program_id, &owner_key, &owner_account_info, &signers)
-            );
-        }
-    }
+//    #[test]
+//    fn test_validate_owner() {
+//        let program_id = Pubkey::new_unique();
+//        let owner_key = Pubkey::new_unique();
+//        let mut signer_keys = [Pubkey::default(); MAX_SIGNERS];
+//        for signer_key in signer_keys.iter_mut().take(MAX_SIGNERS) {
+//            *signer_key = Pubkey::new_unique();
+//        }
+//        let mut signer_lamports = 0;
+//        let mut signer_data = vec![];
+//        let mut signers = vec![
+//            AccountInfo::new(
+//                &owner_key,
+//                true,
+//                false,
+//                &mut signer_lamports,
+//                &mut signer_data,
+//                &program_id,
+//                false,
+//                Epoch::default(),
+//            );
+//            MAX_SIGNERS + 1
+//        ];
+//        for (signer, key) in signers.iter_mut().zip(&signer_keys) {
+//            signer.key = key;
+//        }
+//        let mut lamports = 0;
+//        let mut data = vec![0; Multisig::get_packed_len()];
+//        let mut multisig = Multisig::unpack_unchecked(&data).unwrap();
+//        multisig.m = MAX_SIGNERS as u8;
+//        multisig.n = MAX_SIGNERS as u8;
+//        multisig.signers = signer_keys;
+//        multisig.is_initialized = true;
+//        Multisig::pack(multisig, &mut data).unwrap();
+//        let owner_account_info = AccountInfo::new(
+//            &owner_key,
+//            false,
+//            false,
+//            &mut lamports,
+//            &mut data,
+//            &program_id,
+//            false,
+//            Epoch::default(),
+//        );
+//
+//        // full 11 of 11
+//        Processor::validate_owner(&program_id, &owner_key, &owner_account_info, &signers).unwrap();
+//
+//        // 1 of 11
+//        {
+//            let mut multisig =
+//                Multisig::unpack_unchecked(&owner_account_info.data.borrow()).unwrap();
+//            multisig.m = 1;
+//            Multisig::pack(multisig, &mut owner_account_info.data.borrow_mut()).unwrap();
+//        }
+//        Processor::validate_owner(&program_id, &owner_key, &owner_account_info, &signers).unwrap();
+//
+//        // 2:1
+//        {
+//            let mut multisig =
+//                Multisig::unpack_unchecked(&owner_account_info.data.borrow()).unwrap();
+//            multisig.m = 2;
+//            multisig.n = 1;
+//            Multisig::pack(multisig, &mut owner_account_info.data.borrow_mut()).unwrap();
+//        }
+//        assert_eq!(
+//            Err(ProgramError::MissingRequiredSignature),
+//            Processor::validate_owner(&program_id, &owner_key, &owner_account_info, &signers)
+//        );
+//
+//        // 0:11
+//        {
+//            let mut multisig =
+//                Multisig::unpack_unchecked(&owner_account_info.data.borrow()).unwrap();
+//            multisig.m = 0;
+//            multisig.n = 11;
+//            Multisig::pack(multisig, &mut owner_account_info.data.borrow_mut()).unwrap();
+//        }
+//        Processor::validate_owner(&program_id, &owner_key, &owner_account_info, &signers).unwrap();
+//
+//        // 2:11 but 0 provided
+//        {
+//            let mut multisig =
+//                Multisig::unpack_unchecked(&owner_account_info.data.borrow()).unwrap();
+//            multisig.m = 2;
+//            multisig.n = 11;
+//            Multisig::pack(multisig, &mut owner_account_info.data.borrow_mut()).unwrap();
+//        }
+//        assert_eq!(
+//            Err(ProgramError::MissingRequiredSignature),
+//            Processor::validate_owner(&program_id, &owner_key, &owner_account_info, &[])
+//        );
+//        // 2:11 but 1 provided
+//        {
+//            let mut multisig =
+//                Multisig::unpack_unchecked(&owner_account_info.data.borrow()).unwrap();
+//            multisig.m = 2;
+//            multisig.n = 11;
+//            Multisig::pack(multisig, &mut owner_account_info.data.borrow_mut()).unwrap();
+//        }
+//        assert_eq!(
+//            Err(ProgramError::MissingRequiredSignature),
+//            Processor::validate_owner(&program_id, &owner_key, &owner_account_info, &signers[0..1])
+//        );
+//
+//        // 2:11, 2 from middle provided
+//        {
+//            let mut multisig =
+//                Multisig::unpack_unchecked(&owner_account_info.data.borrow()).unwrap();
+//            multisig.m = 2;
+//            multisig.n = 11;
+//            Multisig::pack(multisig, &mut owner_account_info.data.borrow_mut()).unwrap();
+//        }
+//        Processor::validate_owner(&program_id, &owner_key, &owner_account_info, &signers[5..7])
+//            .unwrap();
+//
+//        // 11:11, one is not a signer
+//        {
+//            let mut multisig =
+//                Multisig::unpack_unchecked(&owner_account_info.data.borrow()).unwrap();
+//            multisig.m = 11;
+//            multisig.n = 11;
+//            Multisig::pack(multisig, &mut owner_account_info.data.borrow_mut()).unwrap();
+//        }
+//        signers[5].is_signer = false;
+//        assert_eq!(
+//            Err(ProgramError::MissingRequiredSignature),
+//            Processor::validate_owner(&program_id, &owner_key, &owner_account_info, &signers)
+//        );
+//        signers[5].is_signer = true;
+//
+//        // 11:11, single signer signs multiple times
+//        {
+//            let mut signer_lamports = 0;
+//            let mut signer_data = vec![];
+//            let signers = vec![
+//                AccountInfo::new(
+//                    &signer_keys[5],
+//                    true,
+//                    false,
+//                    &mut signer_lamports,
+//                    &mut signer_data,
+//                    &program_id,
+//                    false,
+//                    Epoch::default(),
+//                );
+//                MAX_SIGNERS + 1
+//            ];
+//            let mut multisig =
+//                Multisig::unpack_unchecked(&owner_account_info.data.borrow()).unwrap();
+//            multisig.m = 11;
+//            multisig.n = 11;
+//            Multisig::pack(multisig, &mut owner_account_info.data.borrow_mut()).unwrap();
+//            assert_eq!(
+//                Err(ProgramError::MissingRequiredSignature),
+//                Processor::validate_owner(&program_id, &owner_key, &owner_account_info, &signers)
+//            );
+//        }
+//    }
 
     #[test]
     fn test_close_account_dups() {
