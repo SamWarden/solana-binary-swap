@@ -23,9 +23,9 @@ pub enum TokenInstruction {
         freeze_authority: COption<Pubkey>,
     },
     InitializeAccount,
-    /// InitializeMultisig {
-    ///    m: u8,
-    /// },
+    // InitializeMultisig {
+    //    m: u8,
+    // },
     Transfer {
         amount: u64,
     },
@@ -84,10 +84,10 @@ impl TokenInstruction {
                 }
             }
             1 => Self::InitializeAccount,
-            /// 2 => {
-                /// let &m = rest.get(0).ok_or(InvalidInstruction)?;
-                /// Self::InitializeMultisig { m }
-            /// }
+            // 2 => {
+                // let &m = rest.get(0).ok_or(InvalidInstruction)?;
+                // Self::InitializeMultisig { m }
+            // }
             3 | 4 | 7 | 8 => {
                 let amount = rest
                     .get(..8)
@@ -185,10 +185,10 @@ impl TokenInstruction {
                 Self::pack_pubkey_option(freeze_authority, &mut buf);
             }
             Self::InitializeAccount => buf.push(1),
-            /// &Self::InitializeMultisig { m } => {
-            ///    buf.push(2);
-            ///    buf.push(m);
-            /// }
+            // &Self::InitializeMultisig { m } => {
+            //    buf.push(2);
+            //    buf.push(m);
+            // }
             &Self::Transfer { amount } => {
                 buf.push(3);
                 buf.extend_from_slice(&amount.to_le_bytes());
@@ -381,33 +381,33 @@ pub fn initialize_account2(
     })
 }
 
-///pub fn initialize_multisig(
-///    token_program_id: &Pubkey,
-///    multisig_pubkey: &Pubkey,
-///    signer_pubkeys: &[&Pubkey],
-///    m: u8,
-///) -> Result<Instruction, ProgramError> {
-///    if !is_valid_signer_index(m as usize)
-///        || !is_valid_signer_index(signer_pubkeys.len())
-///        || m as usize > signer_pubkeys.len()
-///    {
-///        return Err(ProgramError::MissingRequiredSignature);
-///    }
-///    let data = TokenInstruction::InitializeMultisig { m }.pack();
-///
-///    let mut accounts = Vec::with_capacity(1 + 1 + signer_pubkeys.len());
-///    accounts.push(AccountMeta::new(*multisig_pubkey, false));
-///    accounts.push(AccountMeta::new_readonly(sysvar::rent::id(), false));
-///    for signer_pubkey in signer_pubkeys.iter() {
-///        accounts.push(AccountMeta::new_readonly(**signer_pubkey, false));
-///    }
-///
-///    Ok(Instruction {
-///        program_id: *token_program_id,
-///        accounts,
-///        data,
-///    })
-///}
+//pub fn initialize_multisig(
+//    token_program_id: &Pubkey,
+//    multisig_pubkey: &Pubkey,
+//    signer_pubkeys: &[&Pubkey],
+//    m: u8,
+//) -> Result<Instruction, ProgramError> {
+//    if !is_valid_signer_index(m as usize)
+//        || !is_valid_signer_index(signer_pubkeys.len())
+//        || m as usize > signer_pubkeys.len()
+//    {
+//        return Err(ProgramError::MissingRequiredSignature);
+//    }
+//    let data = TokenInstruction::InitializeMultisig { m }.pack();
+//
+//    let mut accounts = Vec::with_capacity(1 + 1 + signer_pubkeys.len());
+//    accounts.push(AccountMeta::new(*multisig_pubkey, false));
+//    accounts.push(AccountMeta::new_readonly(sysvar::rent::id(), false));
+//    for signer_pubkey in signer_pubkeys.iter() {
+//        accounts.push(AccountMeta::new_readonly(**signer_pubkey, false));
+//    }
+//
+//    Ok(Instruction {
+//        program_id: *token_program_id,
+//        accounts,
+//        data,
+//    })
+//}
 
 pub fn transfer(
     token_program_id: &Pubkey,
@@ -825,12 +825,12 @@ mod test {
         let unpacked = TokenInstruction::unpack(&expect).unwrap();
         assert_eq!(unpacked, check);
 
-        /// let check = TokenInstruction::InitializeMultisig { m: 1 };
-        /// let packed = check.pack();
-        /// let expect = Vec::from([2u8, 1]);
-        /// assert_eq!(packed, expect);
-        /// let unpacked = TokenInstruction::unpack(&expect).unwrap();
-        /// assert_eq!(unpacked, check);
+        // let check = TokenInstruction::InitializeMultisig { m: 1 };
+        // let packed = check.pack();
+        // let expect = Vec::from([2u8, 1]);
+        // assert_eq!(packed, expect);
+        // let unpacked = TokenInstruction::unpack(&expect).unwrap();
+        // assert_eq!(unpacked, check);
 
         let check = TokenInstruction::Transfer { amount: 1 };
         let packed = check.pack();

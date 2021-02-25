@@ -661,10 +661,10 @@ impl Processor {
                 msg!("Instruction: InitializeAccount2");
                 Self::process_initialize_account2(accounts, owner)
             }
-            /// TokenInstruction::InitializeMultisig { m } => {
-            ///    msg!("Instruction: InitializeMultisig");
-            ///    Self::process_initialize_multisig(accounts, m)
-            /// }
+            // TokenInstruction::InitializeMultisig { m } => {
+            //    msg!("Instruction: InitializeMultisig");
+            //    Self::process_initialize_multisig(accounts, m)
+            // }
             TokenInstruction::Transfer { amount } => {
                 msg!("Instruction: Transfer");
                 Self::process_transfer(program_id, accounts, amount, None)
