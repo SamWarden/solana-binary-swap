@@ -92,10 +92,19 @@ pub struct WithdrawSingleTokenTypeExactAmountOut {
     pub maximum_pool_token_amount: u64,
 }
 
+#[cfg_attr(feature = "fuzz", derive(Arbitrary))]
+#[repr(C)]
+#[derive(Clone, Debug, PartialEq)]
+pub struct Start<P> {
+    request: PoolRequest,
+    pool: std::marker::PhantomData<P>,
+}
+
 /// Instructions supported by the token swap program.
 #[repr(C)]
 #[derive(Debug, PartialEq)]
 pub enum SwapInstruction {
+    Start(Start)
     ///   Initializes a new swap
     ///
     ///   0. `[writable, signer]` New Token-swap to create.
@@ -252,6 +261,22 @@ impl SwapInstruction {
                     destination_token_amount,
                     maximum_pool_token_amount,
                 })
+            }
+
+            // start
+            6 => {
+                let tag_bytes = array_ref![rest, 0, 8];
+                if u64::from_le_bytes(*tag_bytes) == PoolRequestTag::TAG_VALUE {
+                    let request: PoolRequest =
+                        BorshDeserialize::try_from_slice(rest).map_err(|e| {
+                            msg!(&e.to_string());
+                            ProgramError::InvalidInstructionData
+                        })?;
+                    Self:Start(Start {
+                        request: request,
+                        pool: PhantomData,
+                    })
+                }
             }
             _ => return Err(SwapError::InvalidInstruction.into()),
         })

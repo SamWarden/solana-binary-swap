@@ -31,6 +31,111 @@ use std::convert::TryInto;
 /// Program state handler.
 pub struct Processor {}
 impl Processor {
+    /// Processes an instruction given extra constraint
+    pub fn process_with_constraints(
+        program_id: &Pubkey,
+        accounts: &[AccountInfo],
+        input: &[u8],
+        swap_constraints: &Option<SwapConstraints>,
+    ) -> ProgramResult {
+        let instruction = SwapInstruction::unpack(input)?;
+        match instruction {
+            SwapInstruction::Start(Start {
+                request,
+                pool,
+            }) => {
+                msg!("Instruction: Start");
+                PoolProcessor::<pool::Pool> {
+                    program_id,
+                    accounts,
+                    request: request.inner,
+                    pool: PhantomData,
+                }
+                .process_instruction()
+            }
+
+
+            SwapInstruction::Initialize(Initialize {
+                nonce,
+                fees,
+                swap_curve,
+            }) => {
+                msg!("Instruction: Init");
+                Self::process_initialize(
+                    program_id,
+                    nonce,
+                    fees,
+                    swap_curve,
+                    accounts,
+                    swap_constraints,
+                )
+            }
+            SwapInstruction::Swap(Swap {
+                amount_in,
+                minimum_amount_out,
+            }) => {
+                msg!("Instruction: Swap");
+                Self::process_swap(program_id, amount_in, minimum_amount_out, accounts)
+            }
+            SwapInstruction::DepositAllTokenTypes(DepositAllTokenTypes {
+                pool_token_amount,
+                maximum_token_a_amount,
+                maximum_token_b_amount,
+            }) => {
+                msg!("Instruction: DepositAllTokenTypes");
+                Self::process_deposit_all_token_types(
+                    program_id,
+                    pool_token_amount,
+                    maximum_token_a_amount,
+                    maximum_token_b_amount,
+                    accounts,
+                )
+            }
+            SwapInstruction::WithdrawAllTokenTypes(WithdrawAllTokenTypes {
+                pool_token_amount,
+                minimum_token_a_amount,
+                minimum_token_b_amount,
+            }) => {
+                msg!("Instruction: WithdrawAllTokenTypes");
+                Self::process_withdraw_all_token_types(
+                    program_id,
+                    pool_token_amount,
+                    minimum_token_a_amount,
+                    minimum_token_b_amount,
+                    accounts,
+                )
+            }
+            SwapInstruction::DepositSingleTokenTypeExactAmountIn(
+                DepositSingleTokenTypeExactAmountIn {
+                    source_token_amount,
+                    minimum_pool_token_amount,
+                },
+            ) => {
+                msg!("Instruction: DepositSingleTokenTypeExactAmountIn");
+                Self::process_deposit_single_token_type_exact_amount_in(
+                    program_id,
+                    source_token_amount,
+                    minimum_pool_token_amount,
+                    accounts,
+                )
+            }
+            SwapInstruction::WithdrawSingleTokenTypeExactAmountOut(
+                WithdrawSingleTokenTypeExactAmountOut {
+                    destination_token_amount,
+                    maximum_pool_token_amount,
+                },
+            ) => {
+                msg!("Instruction: WithdrawSingleTokenTypeExactAmountOut");
+                Self::process_withdraw_single_token_type_exact_amount_out(
+                    program_id,
+                    destination_token_amount,
+                    maximum_pool_token_amount,
+                    accounts,
+                )
+            }
+        }
+    }
+
     /// Unpacks a spl_token `Account`.
     pub fn unpack_token_account(
         account_info: &AccountInfo,
@@ -995,96 +1100,6 @@ impl Processor {
     /// Processes an [Instruction](enum.Instruction.html).
     pub fn process(program_id: &Pubkey, accounts: &[AccountInfo], input: &[u8]) -> ProgramResult {
         Self::process_with_constraints(program_id, accounts, input, &SWAP_CONSTRAINTS)
-    }
-
-    /// Processes an instruction given extra constraint
-    pub fn process_with_constraints(
-        program_id: &Pubkey,
-        accounts: &[AccountInfo],
-        input: &[u8],
-        swap_constraints: &Option<SwapConstraints>,
-    ) -> ProgramResult {
-        let instruction = SwapInstruction::unpack(input)?;
-        match instruction {
-            SwapInstruction::Initialize(Initialize {
-                nonce,
-                fees,
-                swap_curve,
-            }) => {
-                msg!("Instruction: Init");
-                Self::process_initialize(
-                    program_id,
-                    nonce,
-                    fees,
-                    swap_curve,
-                    accounts,
-                    swap_constraints,
-                )
-            }
-            SwapInstruction::Swap(Swap {
-                amount_in,
-                minimum_amount_out,
-            }) => {
-                msg!("Instruction: Swap");
-                Self::process_swap(program_id, amount_in, minimum_amount_out, accounts)
-            }
-            SwapInstruction::DepositAllTokenTypes(DepositAllTokenTypes {
-                pool_token_amount,
-                maximum_token_a_amount,
-                maximum_token_b_amount,
-            }) => {
-                msg!("Instruction: DepositAllTokenTypes");
-                Self::process_deposit_all_token_types(
-                    program_id,
-                    pool_token_amount,
-                    maximum_token_a_amount,
-                    maximum_token_b_amount,
-                    accounts,
-                )
-            }
-            SwapInstruction::WithdrawAllTokenTypes(WithdrawAllTokenTypes {
-                pool_token_amount,
-                minimum_token_a_amount,
-                minimum_token_b_amount,
-            }) => {
-                msg!("Instruction: WithdrawAllTokenTypes");
-                Self::process_withdraw_all_token_types(
-                    program_id,
-                    pool_token_amount,
-                    minimum_token_a_amount,
-                    minimum_token_b_amount,
-                    accounts,
-                )
-            }
-            SwapInstruction::DepositSingleTokenTypeExactAmountIn(
-                DepositSingleTokenTypeExactAmountIn {
-                    source_token_amount,
-                    minimum_pool_token_amount,
-                },
-            ) => {
-                msg!("Instruction: DepositSingleTokenTypeExactAmountIn");
-                Self::process_deposit_single_token_type_exact_amount_in(
-                    program_id,
-                    source_token_amount,
-                    minimum_pool_token_amount,
-                    accounts,
-                )
-            }
-            SwapInstruction::WithdrawSingleTokenTypeExactAmountOut(
-                WithdrawSingleTokenTypeExactAmountOut {
-                    destination_token_amount,
-                    maximum_pool_token_amount,
-                },
-            ) => {
-                msg!("Instruction: WithdrawSingleTokenTypeExactAmountOut");
-                Self::process_withdraw_single_token_type_exact_amount_out(
-                    program_id,
-                    destination_token_amount,
-                    maximum_pool_token_amount,
-                    accounts,
-                )
-            }
-        }
     }
 }
 
