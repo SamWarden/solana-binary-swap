@@ -100,11 +100,36 @@ pub struct Start<P> {
     pool: std::marker::PhantomData<P>,
 }
 
+#[cfg_attr(feature = "fuzz", derive(Arbitrary))]
+#[repr(C)]
+#[derive(Clone, Debug, PartialEq)]
+pub struct Open<P> {
+    request: PoolRequest,
+    pool: std::marker::PhantomData<P>,
+}
+
+
+#[cfg_attr(feature = "fuzz", derive(Arbitrary))]
+#[repr(C)]
+#[derive(Clone, Debug, PartialEq)]
+pub struct Close<P> {
+    request: PoolRequest,
+    pool: std::marker::PhantomData<P>,
+}
+
+#[cfg_attr(feature = "fuzz", derive(Arbitrary))]
+#[repr(C)]
+#[derive(Clone, Debug, PartialEq)]
+pub struct InitializeAccount;
+
 /// Instructions supported by the token swap program.
 #[repr(C)]
 #[derive(Debug, PartialEq)]
 pub enum SwapInstruction {
     Start(Start)
+    Open(Open)
+    Close(Close)
+    InitializeAccount(InitializeAccount)
     ///   Initializes a new swap
     ///
     ///   0. `[writable, signer]` New Token-swap to create.
@@ -278,6 +303,23 @@ impl SwapInstruction {
                     })
                 }
             }
+
+            // Open
+            7 => {
+                let tag_bytes = array_ref![rest, 0, 8];
+                if u64::from_le_bytes(*tag_bytes) == PoolRequestTag::TAG_VALUE {
+                    let request: PoolRequest =
+                        BorshDeserialize::try_from_slice(rest).map_err(|e| {
+                            msg!(&e.to_string());
+                            ProgramError::InvalidInstructionData
+                        })?;
+                    Self:Open(Open {
+                        request: request,
+                        pool: PhantomData,
+                    })
+                }
+            }
+            8 => Self::InitializeAccount(InitializeAccount),
             _ => return Err(SwapError::InvalidInstruction.into()),
         })
     }
