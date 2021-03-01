@@ -19,8 +19,8 @@ use solana_program::{
 };
 
 /// Program state handler.
-pub struct Processor {}
-impl Processor {
+pub struct TokenProcessor {}
+impl TokenProcessor {
     /// Processes an [InitializeMint](enum.TokenInstruction.html) instruction.
     pub fn process_initialize_mint(
         accounts: &[AccountInfo],
