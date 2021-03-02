@@ -84,10 +84,6 @@ impl TokenInstruction {
                 }
             }
             1 => Self::InitializeAccount,
-            // 2 => {
-                // let &m = rest.get(0).ok_or(InvalidInstruction)?;
-                // Self::InitializeMultisig { m }
-            // }
             3 | 4 | 7 | 8 => {
                 let amount = rest
                     .get(..8)

@@ -28,7 +28,17 @@ use solana_program::{
 };
 use std::convert::TryInto;
 
-const SOLANA_URL = "http://localhost:8899"
+const ORACLE_URL = "http://localhost:8899"
+
+fn open_oracle(accounts: &[AccountInfo]) {
+    rpc_client = solana_client::rpc_client::RpcClient::new_with_commitment(ORACLE_URL.into(), CommitmentConfig::confirmed());
+    let account = rpc_client.get_account(&Pubkey::from_str("")?)?;
+}
+
+fn end_oracle(accounts: &[AccountInfo]) {
+    rpc_client = solana_client::rpc_client::RpcClient::new_with_commitment(ORACLE_URL.into(), CommitmentConfig::confirmed());
+    let account = rpc_client.get_account(&Pubkey::from_str("")?)?;
+}
 
 /// Program state handler.
 pub struct Processor {}
@@ -58,6 +68,8 @@ impl Processor {
             SwapInstruction::Open(Open {
                 request,
                 pool,
+                liquidity_amount,
+                config,
             }) => {
                 msg!("Instruction: Open");
                 let pool1 = PoolProcessor::<pool::Pool> {
@@ -74,10 +86,8 @@ impl Processor {
                     pool: PhantomData,
                 };
                 pool2.initialize_pool(pool2.request)?;
-                rpc_client = solana_client::rpc_client::RpcClient::new_with_commitment(SOLANA_URL.into(), CommitmentConfig::confirmed());
-                let account = rpc_client.get_account(&Pubkey::from_str("")?)?;
-
-            }
+                open_oracle(accounts);
+                market::process_init_reserve(program_id, liquidity_amount, config, accounts)
 
             SwapInstruction::Close(Close {
                 request,
@@ -90,27 +100,13 @@ impl Processor {
                     request: request.inner,
                     pool: PhantomData,
                 }
-                .process_instruction()
+                .process_instruction();
+                end_oracle(accounts)
             }
             SwapInstruction::InitializeAccount(InitializeAccount) => {
                 TokenProcessor::process_initialize_account(accounts)
             },
 
-            // SwapInstruction::Initialize(Initialize {
-            //     nonce,
-            //     fees,
-            //     swap_curve,
-            // }) => {
-            //     msg!("Instruction: Init");
-            //     Self::process_initialize(
-            //         program_id,
-            //         nonce,
-            //         fees,
-            //         swap_curve,
-            //         accounts,
-            //         swap_constraints,
-            //     )
-            // }
             SwapInstruction::Swap(Swap {
                 amount_in,
                 minimum_amount_out,

@@ -106,6 +106,8 @@ pub struct Start<P> {
 pub struct Open<P> {
     request: PoolRequest,
     pool: std::marker::PhantomData<P>,
+    liquidity_amount,
+    config,
 }
 
 
